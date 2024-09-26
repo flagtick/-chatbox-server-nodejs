@@ -1,49 +1,80 @@
-const express = require("./config/express.js"),
-    mongoose = require("mongoose");
-
+const express = require("./config/express.js");
+const Logger = require('./utils/logger');
+const mongoose = require('./config/mongoose');
 const app = express.init();
-const server = require("http").createServer(app);
-const io = require("socket.io")(server);
+
+const http = require('http');
+const fs = require('fs');
+const server = http.createServer({},app);
+
+const io = require('socket.io')(server, {
+    cors: {
+        origin: '*',
+    }, 
+    path: '/api/socket'});
+
+/**
+ * Custom specific endpoint to socket client listen : path /api/socket
+ * Remove websoket from client to avoid BLOCK HTTPS
+ * Install SSL Signed certificate to server
+ * Add cors: origin: '*' resolve bug: https://localhost:3000/api/socket/?EIO=4&transport=polling upon client request
+ * Concern: 
+ * - Need to install SSL to Apache2 and configur proxy_http to https. (YES, NO)
+ * - CDN support mask HTTPS instead of configure ssl in Apache2 (YES, NO)
+ * - SSL Signed in Node.js need (YES, NO) YES
+ */
+ io.on('connection', function (socket) {
+    Logger.info('Welcome to server chat');
+    socket.on('technical-issue', function (data) {
+        io.sockets.emit('technical-issue', data);
+    });
+});
+
+app.get("/", (req, res) => {
+    res.send("<h1>Your server has start from deployment!!</h1>");
+});
+
+app.disable('etag');
 
 server.listen(3000, () => {
-    console.log('Server started on port 3000');
+    Logger.info('Server started on port 3000');
 });
+
 
 /** Socket.io */
-io.of("/api/socket").on("connection", (socket) => {
-    console.log("socket.io: Connection established successfully: ", socket.id);
+// io.of("/api/socket").on("connection", (socket) => {
+//     Logger.info("socket.io: Connection established successfully: ", socket.id);
   
-    socket.on("disconnect", () => {
-      console.log("socket.io: Connection lose!: ", socket.id);
-    });
+//     socket.on("disconnect", () => {
+//         Logger.info("socket.io: Connection lose!: ", socket.id);
+//     });
+// });
 
-    // socket.on('technical-issue', (msg) => {
-    //   console.log('message: ' + msg);
-    // });
-});
+// const connection = mongoose.connection;
 
-/** Connect MongoDB from Node.js application */
-mongoose.set('strictQuery', false);
-mongoose.connect('mongodb+srv://flagtick:YvwSHeSJL0rVYpJN@cluster0.rlpe6rz.mongodb.net/chatbox?retryWrites=true&w=majority', {
-    useNewUrlParser: true, 
-    useUnifiedTopology: true 
-});
+// const collections = mongoose.connection.collections;
+// Promise.all(Object.values(collections).map(async (collection) => {
+//     await collection.deleteMany({}); 
+// }));
 
-const connection = mongoose.connection;
-
-connection.once("open", () => {
-
-    const messageCollectionStream = connection.collection("messages").watch();
-    messageCollectionStream.on("change", (change) => {
-        switch (change.operationType) {
-          case "insert":
-            console.log(change.operationType);
-            io.of("/api/socket").emit("technical-issue", 'Your problem will be solving. Please wait for a moment!');
-            break;
-          case "delete":
-            break;
-        }
-    });
-
-});
+// connection.once("open", async () => {
+//     const messageCollectionStream = connection.collection("messages").watch();
+//     const coll = connection.collection("messages");
+//     let listMessages = [];
+//     messageCollectionStream.on("change", async (change) => {
+//         switch (change.operationType) {
+//           case "insert":
+//             const cursor = coll.find();
+//             await cursor.forEach( (cursor) => {
+//                 listMessages.push(cursor);
+//             });
+//             Logger.info(listMessages);
+//             io.of("/api/socket").emit("technical-issue", listMessages);
+//             listMessages = [];
+//             break;
+//           case "delete":
+//             break;
+//         }
+//     });
+// });
 
